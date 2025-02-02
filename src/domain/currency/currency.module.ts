@@ -1,4 +1,6 @@
+import { HttpModule } from '@nestjs/axios';
 import { Module } from '@nestjs/common';
+import { ConfigModule } from '@nestjs/config';
 import { TypeOrmModule } from '@nestjs/typeorm';
 import { CurrencyController } from './controllers/currency.controller';
 import { CurrencyPrice } from './entities/currency-price.entity';
@@ -8,7 +10,9 @@ import { CurrencyService } from './services/currency.service';
 
 @Module({
   imports: [
-    TypeOrmModule.forFeature([Currency, CurrencyPrice, CurrencyTransaction]),
+    TypeOrmModule.forFeature([Currency, CurrencyTransaction, CurrencyPrice]),
+    HttpModule,
+    ConfigModule,
   ],
   controllers: [CurrencyController],
   providers: [CurrencyService],

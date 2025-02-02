@@ -1,5 +1,5 @@
 // currency.controller.ts
-import { Controller, Get, Query } from '@nestjs/common';
+import { Controller, Get, Post, Query } from '@nestjs/common';
 import {
   GetLatestResponseDto,
   GetTransactionsRequestDto,
@@ -21,5 +21,15 @@ export class CurrencyController {
     @Query() query: GetTransactionsRequestDto,
   ): Promise<GetTransactionsResponseDto> {
     return this.currencyService.getTransactions(query);
+  }
+
+  @Post('seed')
+  async seedData(): Promise<string> {
+    return this.currencyService.seedLatestData();
+  }
+
+  @Post('seed-transactions')
+  async seedTransactions() {
+    return this.currencyService.seeTransactionsData();
   }
 }
