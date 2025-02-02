@@ -131,7 +131,7 @@ export class CurrencyService {
       const token = this.configService.get<string>('CURRENCY_API_TOKEN');
 
       if (!token) {
-        throw new Error('CURRENCY_API_TOKEN is not configured');
+        throw new Error('Please configure CURRENCY_API_TOKEN in your .env file');
       }
 
       const headers = {
@@ -142,44 +142,65 @@ export class CurrencyService {
       const response = await firstValueFrom(
         this.httpService.get<SeedCurrencyDto[]>(refApiUrl, { headers }),
       ).catch((error) => {
-        logger.error(
-          `API request failed: ${error.response?.data || error.message}`,
-        );
-        throw new Error(
-          `API request failed: ${error.response?.data?.message || error.message}`,
-        );
+        if (error.response?.status === 401) {
+          throw new Error('Invalid API token. Please check your CURRENCY_API_TOKEN');
+        }
+        if (error.response?.status === 404) {
+          throw new Error('API endpoint not found. Please check your CURRENCY_API_URL');
+        }
+        logger.error(`API request failed: ${error.message}`);
+        throw new Error(`Unable to fetch currency data: ${error.message}`);
       });
 
-      // Process 1000 records
-      const currencies = response.data.slice(0, 1000);
+      // Process currencies
+      const currencies = response.data;
+      let processedCount = 0;
+      let skippedCount = 0;
 
       for (const currencyData of currencies) {
-        // Create Currency
-        const currency = await queryRunner.manager.save(
-          queryRunner.manager.create(Currency, {
-            code: currencyData.code,
-            unit: currencyData.unit,
-          }),
-        );
+        try {
+          // Check if currency already exists
+          const existingCurrency = await queryRunner.manager.findOne(Currency, {
+            where: { code: currencyData.code },
+          });
 
-        // Create CurrencyPrices
-        const prices = currencyData.prices.map((priceData, index) => {
-          const price = new CurrencyPrice();
-          price.value = parseFloat(priceData.value.replace(/,/g, '')); // Convert "4,460.00" to 4460.00
-          price.sign = priceData.sign as CurrencyPriceSign;
-          price.type = index === 0 ? CurrencyBuySell.BUY : CurrencyBuySell.SELL; // First price is BUY, second is SELL
-          price.currency = currency;
-          return price;
-        });
+          if (existingCurrency) {
+            skippedCount++;
+            continue;
+          }
 
-        await queryRunner.manager.save(prices); // Array ကို Save လုပ်ပါ
+          // Create Currency
+          const currency = await queryRunner.manager.save(
+            queryRunner.manager.create(Currency, {
+              code: currencyData.code,
+              unit: currencyData.unit,
+            }),
+          );
+
+          // Create CurrencyPrices
+          const prices = currencyData.prices.map((priceData, index) => {
+            const price = new CurrencyPrice();
+            price.value = parseFloat(priceData.value.replace(/,/g, '')); // Convert "4,460.00" to 4460.00
+            price.sign = priceData.sign as CurrencyPriceSign;
+            price.type = index === 0 ? CurrencyBuySell.BUY : CurrencyBuySell.SELL;
+            price.currency = currency;
+            return price;
+          });
+
+          await queryRunner.manager.save(prices);
+          processedCount++;
+        } catch (error) {
+          logger.warn(`Failed to process currency ${currencyData.code}: ${error.message}`);
+          continue;
+        }
       }
 
       await queryRunner.commitTransaction();
-      return 'Successfully seeded 1000 records!';
+      return `Successfully processed ${processedCount} currencies (${skippedCount} already existed)`;
     } catch (error) {
+      logger.error(`Seeding failed: ${error.message}`);
       await queryRunner.rollbackTransaction();
-      throw new Error(`Seeding failed: ${error.message}`);
+      throw new Error(error.message);
     } finally {
       await queryRunner.release();
     }
@@ -204,7 +225,7 @@ export class CurrencyService {
         const token = this.configService.get<string>('CURRENCY_API_TOKEN');
 
         if (!token) {
-          throw new Error('CURRENCY_API_TOKEN is not configured');
+          throw new Error('Please configure CURRENCY_API_TOKEN in your .env file');
         }
 
         const headers = {
