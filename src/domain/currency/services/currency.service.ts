@@ -5,7 +5,7 @@ import {
   getCurrentDate,
   getPreviousDate,
 } from '@common/helpers';
-import { Injectable } from '@nestjs/common';
+import { Injectable, NotFoundException } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { LessThanOrEqual, Repository } from 'typeorm';
 import {
@@ -32,11 +32,17 @@ export class CurrencyService {
       relations: ['currentPrices'],
     });
 
+    if (currencies.length === 0) {
+      throw new NotFoundException('No currencies found');
+    }
+
+
     return currencies.map((currency) => ({
       id: currency.id,
       code: currency.code,
       unit: currency.unit,
       prices: currency.currentPrices
+
         .sort((a, b) => (a.type === CurrencyBuySell.BUY ? -1 : 1)) // Buy first, Sell second
         .map((price) => ({
           value: price.value.toString(),

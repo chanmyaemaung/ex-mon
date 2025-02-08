@@ -23,12 +23,17 @@ services:
   redis:
     image: redis:7.2-alpine
     ports:
-      - "6379:6379"
+      - ${REDIS_PORT}:6379
     volumes:
       - redis_data:/data
     command: redis-server --appendonly yes
     networks:
       - app-network
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
 
 volumes:
   database_data:
